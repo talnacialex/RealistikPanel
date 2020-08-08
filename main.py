@@ -9,8 +9,8 @@ import os
 from updater import *
 from threading import Thread
 
-print(f" {Fore.BLUE}Running Build {GetBuild()}")
-ConsoleLog(f"RealistikPanel (Build {GetBuild()}) started!")
+print(f" {Fore.BLUE}Running Build {GetBuild()}, modified for katakuna!shiori and katakuna!kodachi")
+ConsoleLog(f"RealistikPanel (Build {GetBuild()}, modified for katakuna!shiori and katakuna!kodachi) started!")
 
 app = Flask(__name__)
 recaptcha = ReCaptcha(app=app)
@@ -412,6 +412,7 @@ def ApiStatus():
 @app.route("/js/status/lets")
 def LetsStatus():
     try:
+        print(UserConfig["LetsAPI"] + "v1/status")
         return jsonify(requests.get(UserConfig["LetsAPI"] + "v1/status").json()) #this url to provide a predictable result
     except:
         return jsonify({
@@ -626,7 +627,7 @@ def BadCodeError(error):
 
 #we make sure session exists
 @app.before_request
-def BeforeRequest(): 
+def BeforeRequest():
     if "LoggedIn" not in list(dict(session).keys()): #we checking if the session doesnt already exist
         for x in list(ServSession.keys()):
             session[x] = ServSession[x]

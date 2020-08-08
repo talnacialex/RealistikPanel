@@ -8,7 +8,7 @@ import datetime
 import requests
 from discord_webhook import DiscordWebhook, DiscordEmbed
 import time
-import hashlib 
+import hashlib
 import json
 import pycountry
 from osrparse import *
@@ -19,7 +19,7 @@ import timeago
 init() #initialises colourama for colours
 Changelogs.reverse()
 
-print(fr"""{Fore.BLUE}  _____            _ _     _   _ _    _____                 _ _ 
+print(fr"""{Fore.BLUE}  _____            _ _     _   _ _    _____                 _ _
  |  __ \          | (_)   | | (_) |  |  __ \               | | |
  | |__) |___  __ _| |_ ___| |_ _| | _| |__) |_ _ _ __   ___| | |
  |  _  // _ \/ _` | | / __| __| | |/ /  ___/ _` | '_ \ / _ \ | |
@@ -45,7 +45,7 @@ def ConsoleLog(Info: str, Additional: str="", Type: int=1):
         #if doesnt exist
         with open("realistikpanel.log", "w+") as json_file:
             json.dump([], json_file, indent=4)
-    
+
     #gets current log
     with open("realistikpanel.log", "r") as Log:
         Log = json.load(Log)
@@ -69,7 +69,7 @@ def ConsoleLog(Info: str, Additional: str="", Type: int=1):
         Colour = "15417396"
         TypeText = "error"
         Icon = "https://freeiconshop.com/wp-content/uploads/edd/error-flat.png"
-    
+
     #I promise to redo this, this is just proof of concept
     if UserConfig["ConsoleLogWebhook"] != "":
         webhook = DiscordWebhook(url=UserConfig["ConsoleLogWebhook"])
@@ -102,75 +102,86 @@ except Exception as e:
     exit()
 
 mycursor = mydb.cursor(buffered=True) #creates a thing to allow us to run mysql commands
-mycursor.execute(f"USE {UserConfig['SQLDatabase']}") #Sets the db to ripple
+mycursor.execute(f"USE {UserConfig['SQLDatabase']}") # Sets the db to the desired DB. ez
 mycursor.execute("SET SESSION TRANSACTION ISOLATION LEVEL READ COMMITTED")
 
 #fix potential crashes
 #have to do it this way as the crash issue is a connector module issue
-mycursor.execute("SELECT COUNT(*) FROM users_stats WHERE userpage_content = ''")
-BadUserCount = mycursor.fetchone()[0]
-if BadUserCount > 0:
-    print(f"{Fore.RED} Found {BadUserCount} users with potentially problematic data!{Fore.RESET}")
-    print(" Fixing...", end="")#end = "" means it doesnt do a newline
-    mycursor.execute("UPDATE users_stats SET userpage_content = NULL WHERE userpage_content = ''")
-    mydb.commit()
-    print(" Done!")
+mycursor.execute("SELECT COUNT(*) FROM users")
+UserCount = mycursor.fetchone()[0]
+print(f"{Fore.GREEN} Found {UserCount} users in the database.{Fore.RESET}")
 
 #public variables
-PlayerCount = [] # list of players 
+PlayerCount = [] # list of players
 CachedStore = {}
 
 def DashData():
     #note to self: add data caching so data isnt grabbed every time the dash is accessed
     """Grabs all the values for the dashboard."""
-    mycursor.execute("SELECT value_string FROM system_settings WHERE name = 'website_global_alert'")
+    mycursor.execute("SELECT value FROM config WHERE name = 'homepage.global.alert'")
     Alert = mycursor.fetchall()
     if len(Alert) == 0:
         #some ps only have home alert
-        mycursor.execute("SELECT value_string FROM system_settings WHERE name = 'website_home_alert'")
+        mycursor.execute("SELECT value FROM config WHERE name = 'homepage.home.alert'")
         #if also that doesnt exist
         Alert = mycursor.fetchall()
         if len(Alert) == 0:
             Alert = [[]]
-    Alert = Alert[0][0]
+
+    Alert = Alert[0]
     if Alert == "": #checks if no alert
         Alert = False
 
-    totalPP = r.get("ripple:total_pp")#Not calculated by every server .decode("utf-8")
-    RegisteredUsers = r.get("ripple:registered_users")
-    OnlineUsers = r.get("ripple:online_users")
-    TotalPlays = r.get("ripple:total_plays")
-    TotalScores = r.get("ripple:total_submitted_scores")
+    totalPP = r.get("shiori:total_pp")#Not calculated by every server .decode("utf-8")
+
+    # kodachi! stores crap in database so use database crap.
+    # TODO: OPTIMIZE THE QUERIES MAKE THEM INTO ONE QUERY
+    mycursor.execute("SELECT COUNT(*) FROM users")
+    RegisteredUsers = str(mycursor.fetchone()[0])
+    #RegisteredUsers = r.get("shiori:registered_users")
+
+    mycursor.execute("SELECT COUNT(*) FROM tokens")
+    OnlineUsers = str(mycursor.fetchone()[0])
+    #OnlineUsers = r.get("shiori:online_users")
+
+    mycursor.execute("SELECT COUNT(*) FROM user_plays WHERE pass = 1")
+    TotalPlays = str(mycursor.fetchone()[0])
+    #TotalPlays = r.get("shiori:total_plays")
+
+    mycursor.execute("SELECT COUNT(*) FROM user_plays")
+    TotalScores = str(mycursor.fetchone()[0])
+    #TotalScores = r.get("shiori:total_submitted_scores")
 
     #If we dont have variable(variable is None) will set it and get it again
     if not totalPP:
-        r.set('ripple:total_pp', 0)
-        totalPP = r.get("ripple:total_pp")
+        r.set('shiori:total_pp', 0)
+        totalPP = r.get("shiori:total_pp")
     if not RegisteredUsers:
-        r.set('ripple:registered_users', 1)
-        RegisteredUsers = r.get("ripple:registered_users")
+        r.set('shiori:registered_users', 1)
+        RegisteredUsers = r.get("shiori:registered_users")
     if not OnlineUsers:
-        r.set('ripple:online_users', 1)
-        OnlineUsers = r.get("ripple:online_users")
+        r.set('shiori:online_users', 1)
+        OnlineUsers = r.get("shiori:online_users")
     if not TotalPlays:
-        r.set('ripple:total_plays', 1)
-        TotalPlays = r.get("ripple:total_plays")
+        r.set('shiori:total_plays', 1)
+        TotalPlays = r.get("shiori:total_plays")
     if not TotalScores:
-        r.set('ripple:total_submitted_scores', 1)
-        TotalScores = r.get("ripple:total_submitted_scores")
+        r.set('shiori:total_submitted_scores', 1)
+        TotalScores = r.get("shiori:total_submitted_scores")
     response = {
-        "RegisteredUsers" : RegisteredUsers.decode("utf-8") ,
-        "OnlineUsers" : OnlineUsers.decode("utf-8"),
-        "TotalPP" : f'{int(totalPP.decode("utf-8")):,}',
-        "TotalPlays" : f'{int(TotalPlays.decode("utf-8")):,}',
-        "TotalScores" : f'{int(TotalScores.decode("utf-8")):,}',
+        "RegisteredUsers" : RegisteredUsers,
+        "OnlineUsers" : OnlineUsers,
+        "TotalPP" : f'{int(totalPP):,}',
+        "TotalPlays" : f'{int(TotalPlays):,}',
+        "TotalScores" : f'{int(TotalScores):,}',
         "Alert" : Alert
     }
     return response
 
 def LoginHandler(username, password):
     """Checks the passwords and handles the sessions."""
-    mycursor.execute("SELECT username, password_md5, ban_datetime, privileges, id FROM users WHERE username_safe = %s", (RippleSafeUsername(username),))
+    # we don't need username filtration ok
+    mycursor.execute("SELECT username, password_hash, banned, id, bot FROM users WHERE username = %s", (username,))
     User = mycursor.fetchall()
     if len(User) == 0:
         #when user not found
@@ -181,17 +192,22 @@ def LoginHandler(username, password):
         Username = User[0]
         PassHash = User[1]
         IsBanned = User[2]
-        Privilege = User[3]
-        UserID = User[4]
-        
+        UserID = User[3]
+        Bot = User[4]
+
         #Converts IsBanned to bool
         if IsBanned == "0" or not IsBanned:
             IsBanned = False
         else:
             IsBanned = True
-        
+
+        if Bot == "0" or not Bot:
+            Bot = False
+        else:
+            Bot = True
+
         #dont  allow the bot account to log in (in case the server has a MASSIVE loophole)
-        if UserID == 999:
+        if Bot:
             return [False, "You may not log into the bot account."]
 
         #shouldve been done during conversion but eh
@@ -204,7 +220,7 @@ def LoginHandler(username, password):
                         "LoggedIn" : True,
                         "AccountId" : UserID,
                         "AccountName" : Username,
-                        "Privilege" : Privilege,
+                        "Privilege" : 2,
                         "exp" : datetime.datetime.utcnow() + datetime.timedelta(hours=2) #so the token expires
                     }]
                 else:
@@ -238,11 +254,11 @@ def RecentPlays(TotalPlays = 20, MinPP = 0):
     if UserConfig["HasAutopilot"]:
         DivBy += 1
     PerGamemode = round(TotalPlays/DivBy)
-    mycursor.execute("SELECT scores.beatmap_md5, users.username, scores.userid, scores.time, scores.score, scores.pp, scores.play_mode, scores.mods, scores.300_count, scores.100_count, scores.50_count, scores.misses_count FROM scores LEFT JOIN users ON users.id = scores.userid WHERE users.privileges & 1 AND scores.pp >= %s ORDER BY scores.time DESC LIMIT %s", (MinPP, PerGamemode,))
+    mycursor.execute("SELECT beatmaps.md5, users.username, user_plays.user_id, user_plays.time, user_plays.score, 0, user_plays.gameMode, user_plays.mods, user_plays.count300, user_plays.count100, user_plays.count50, user_plays.miss FROM user_plays LEFT JOIN users ON users.id = user_plays.user_id LEFT JOIN beatmaps ON beatmaps.id = user_plays.beatmap_id WHERE user_plays.gameMode < 4 ORDER BY user_plays.score DESC LIMIT %s", (PerGamemode,))
     plays = mycursor.fetchall()
     if UserConfig["HasRelax"]:
         #adding relax plays
-        mycursor.execute("SELECT scores_relax.beatmap_md5, users.username, scores_relax.userid, scores_relax.time, scores_relax.score, scores_relax.pp, scores_relax.play_mode, scores_relax.mods, scores_relax.300_count, scores_relax.100_count, scores_relax.50_count, scores_relax.misses_count FROM scores_relax LEFT JOIN users ON users.id = scores_relax.userid WHERE users.privileges & 1 AND scores_relax.pp >= %s ORDER BY scores_relax.time DESC LIMIT %s", (MinPP, PerGamemode,))
+        mycursor.execute("SELECT beatmaps.md5, users.username, user_plays.user_id, user_plays.time, user_plays.score, 0, user_plays.gameMode, user_plays.mods, user_plays.count300, user_plays.count100, user_plays.count50, user_plays.miss FROM user_plays LEFT JOIN users ON users.id = user_plays.user_id LEFT JOIN beatmaps ON beatmaps.id = user_plays.beatmap_id WHERE user_plays.gameMode > 4 ORDER BY user_plays.score DESC LIMIT %s", (PerGamemode,))
         playx_rx = mycursor.fetchall()
         for plays_rx in playx_rx:
             #addint them to the list
@@ -250,7 +266,7 @@ def RecentPlays(TotalPlays = 20, MinPP = 0):
             plays.append(plays_rx)
     if UserConfig["HasAutopilot"]:
         #adding relax plays
-        mycursor.execute("SELECT scores_ap.beatmap_md5, users.username, scores_ap.userid, scores_ap.time, scores_ap.score, scores_ap.pp, scores_ap.play_mode, scores_ap.mods, scores_ap.300_count, scores_ap.100_count, scores_ap.50_count, scores_ap.misses_count FROM scores_ap LEFT JOIN users ON users.id = scores_ap.userid WHERE users.privileges & 1 AND scores_ap.pp >= %s ORDER BY scores_ap.time DESC LIMIT %s", (MinPP, PerGamemode,))
+        mycursor.execute("SELECT beatmaps.md5, users.username, user_plays.user_id, user_plays.time, user_plays.score, 0, user_plays.gameMode, user_plays.mods, user_plays.count300, user_plays.count100, user_plays.count50, user_plays.miss FROM user_plays LEFT JOIN users ON users.id = user_plays.user_id LEFT JOIN beatmaps ON beatmaps.id = user_plays.beatmap_id WHERE user_plays.gameMode > 4 ORDER BY user_plays.score DESC LIMIT %s", (PerGamemode,))
         playx_ap = mycursor.fetchall()
         for plays_ap in playx_ap:
             #addint them to the list
@@ -267,7 +283,7 @@ def RecentPlays(TotalPlays = 20, MinPP = 0):
         #yes im doing this
         #lets get the song name
         BeatmapMD5 = x[0]
-        mycursor.execute("SELECT song_name FROM beatmaps WHERE beatmap_md5 = %s", (BeatmapMD5,))
+        mycursor.execute("SELECT beatmap_sets.title FROM beatmaps LEFT JOIN beatmap_sets ON beatmap_sets.id = beatmaps.set_id WHERE beatmaps.md5 = %s", (BeatmapMD5,))
         SongFetch = mycursor.fetchall()
         if len(SongFetch) == 0:
             #checking if none found
@@ -289,14 +305,14 @@ def RecentPlays(TotalPlays = 20, MinPP = 0):
         Dicti["Time"] = TimestampConverter(x[3])
         Dicti["Accuracy"] = round(GetAccuracy(x[8], x[9], x[10], x[11]), 2)
         ReadableArray.append(Dicti)
-    
+
     ReadableArray = sorted(ReadableArray, key=lambda k: k["Timestamp"]) #sorting by time
     ReadableArray.reverse()
     return ReadableArray
 
 def FetchBSData():
     """Fetches Bancho Settings."""
-    mycursor.execute("SELECT name, value_string, value_int FROM bancho_settings WHERE name = 'bancho_maintenance' OR name = 'menu_icon' OR name = 'login_notification'")
+    mycursor.execute("SELECT name, value, value_int FROM bancho_settings WHERE name = 'bancho_maintenance' OR name = 'menu_icon' OR name = 'login_notification'")
     Query = list(mycursor.fetchall())
     #bancho maintenence
     if Query[0][2] == 0:
@@ -326,20 +342,20 @@ def BSPostHandler(post, session):
 
     #SQL Queries
     if MenuIcon != False: #this might be doable with just if not BanchoMan
-        mycursor.execute("UPDATE bancho_settings SET value_string = %s, value_int = 1 WHERE name = 'menu_icon'", (MenuIcon,))
+        mycursor.execute("UPDATE bancho_settings SET value = %s, value_int = 1 WHERE name = 'menu_icon'", (MenuIcon,))
     else:
-        mycursor.execute("UPDATE bancho_settings SET value_string = '', value_int = 0 WHERE name = 'menu_icon'")
+        mycursor.execute("UPDATE bancho_settings SET value = '', value_int = 0 WHERE name = 'menu_icon'")
 
     if LoginNotif != False:
-        mycursor.execute("UPDATE bancho_settings SET value_string = %s, value_int = 1 WHERE name = 'login_notification'", (LoginNotif,))
+        mycursor.execute("UPDATE bancho_settings SET value = %s, value_int = 1 WHERE name = 'login_notification'", (LoginNotif,))
     else:
-        mycursor.execute("UPDATE bancho_settings SET value_string = '', value_int = 0 WHERE name = 'login_notification'")
+        mycursor.execute("UPDATE bancho_settings SET value = '', value_int = 0 WHERE name = 'login_notification'")
 
     if BanchoMan:
         mycursor.execute("UPDATE bancho_settings SET value_int = 1 WHERE name = 'bancho_maintenance'")
     else:
         mycursor.execute("UPDATE bancho_settings SET value_int = 0 WHERE name = 'bancho_maintenance'")
-    
+
     mydb.commit()
     RAPLog(session["AccountId"], "modified the bancho settings")
 
@@ -367,7 +383,7 @@ def GetBmapInfo(id):
         BMS_Data = mycursor.fetchall()
     BeatmapList = []
     for beatmap in BMS_Data:
-        thing = { 
+        thing = {
             "SongName" : beatmap[0],
             "Ar" : str(beatmap[1]),
             "Difficulty" : str(round(beatmap[2], 2)),
@@ -385,9 +401,25 @@ def GetBmapInfo(id):
         beatmap["BmapNumber"] = BMapNumber
     return BeatmapList
 
+def CheckPermission(Permissions, Permission):
+    # here comes kodachi! crap permission handling
+    RestrictedPermissions = []
+
+    for permission in Permissions:
+        if permission[0] in RestrictedPermissions:
+            continue
+        if permission[0][0] is '-':
+            if Permission[0] is '-' or permission[0][1:] in RestrictedPermissions:
+                continue
+            RestrictedPermissions.append(permission[0][1:])
+            continue
+        if permission[0] == Permission:
+            return True
+    return False
+
 def HasPrivilege(UserID : int, ReqPriv = 2):
     """Check if the person trying to access the page has perms to do it."""
-    #tbh i shouldve done it where you pass the priv enum instead
+    # bro here we have text perms
 
     # 0 = no verification
     # 1 = Only registration required
@@ -439,50 +471,60 @@ def HasPrivilege(UserID : int, ReqPriv = 2):
     if ReqPriv == 0: #dont use this like at all
         return True
 
-    #gets users privilege
-    mycursor.execute("SELECT privileges FROM users WHERE id = %s", (UserID,))
-    Privilege = mycursor.fetchall()
-    if len(Privilege) == 0:
-        Privilege = 0
-    else:
-        Privilege = Privilege[0][0]
+    #gets users permissions using top technology haha
+    mycursor.execute("SELECT role_permission.permission FROM role_permission INNER JOIN user_user_role ON role_permission.role_id = user_user_role.role_id WHERE user_user_role.user_id = %s", (UserID,))
+    Permissions = mycursor.fetchall()
 
-    if ReqPriv == 1:
-        result = Privilege & UserNormal
-    elif ReqPriv == 2:
-        result = Privilege & AccessRAP
-    elif ReqPriv == 3:
-        result = Privilege & ManageBeatmaps
-    elif ReqPriv == 4:
-        result = Privilege & ManageSettings
-    elif ReqPriv == 5:
-        result = Privilege & BanUsers
-    elif ReqPriv == 6:
-        result = Privilege & ManageUsers
-    elif ReqPriv == 7:
-        result = Privilege & ViewRAPLogs
-    elif ReqPriv == 8:
-        result = Privilege & RPNominate
-    elif ReqPriv == 9:
-        result = Privilege & RPNominateAccept
-    elif ReqPriv == 10:
-        result = Privilege & RPOverwatch
-    elif ReqPriv == 11:
-        result = Privilege & WipeUsers
-    elif ReqPriv == 12:
-        result = Privilege & KickUsers
-    elif ReqPriv == 13:
-        result = Privilege & ManagePrivileges
-    elif ReqPriv == 14:
-        result = Privilege & RPErrorLogs
-    elif ReqPriv == 15:
-        result = Privilege & RPManageClans
-    
-    if result >= 1:
-        return True
-    else:
+    # no permissions? no problem: no permission allowed.
+    if len(Permissions) == 0:
         return False
-    
+
+    # fuck yandev if elif here's PermissionTable(tm)
+    PermissionTable = [
+        "admin", # IDK?
+        "admin.dashboard", # AccessRAP
+        "admin.beatmap.manage", # ManageBeatmaps
+        "admin.settings", # ManageSettings
+        "admin.users.manage.ban", # BanUsers
+        "admin.users.manage", # ManageUsers
+        "admin.logs.view", # ViewRAPLogs
+        "admin.nominate", # RPNominate
+        "admin.nominate.accept", # RPNominateAccept
+        "admin.overwatch", # RPOverwatch
+        "admin.users.manage.wipe", # WipeUsers
+        "admin.users.manage.kick", # KickUsers
+        "admin.users.manage.permission", # ManagePrivileges
+        "admin.errors.view", # RPErrorLogs
+        "admin.clan.manage" # RPManageClans
+    ]
+
+    # no known mapped permission? no problem. you don't have permission.
+    if ReqPriv > len(PermissionTable):
+        return False;
+
+    requestedPermission = PermissionTable[ReqPriv - 2]
+
+    if CheckPermission(Permissions, requestedPermission):
+        return True
+
+    if CheckPermission(Permissions, '-' + requestedPermission):
+        return False
+
+    if CheckPermission(Permissions, '*'):
+        return True
+
+    splittedPerm = requestedPermission.split(".")
+    print(splittedPerm)
+
+    for i in range(len(splittedPerm)):
+        generatedPermission = '.'.join(splittedPerm[:i+1]) + ".*"
+        print(generatedPermission)
+        if CheckPermission(Permissions, generatedPermission):
+            return True
+        if CheckPermission(Permissions, '-' + generatedPermission):
+            return False
+
+    return False
 
 def RankBeatmap(BeatmapNumber, BeatmapId, ActionName, session):
     """Ranks a beatmap"""
@@ -564,19 +606,17 @@ def RAPLog(UserID=999, Text="forgot to assign a text value :/"):
 
 def checkpw(dbpassword, painpassword):
     """
-    By: kotypey
+    By: talnacialex
     password checking...
     """
 
-    result = hashlib.md5(painpassword.encode()).hexdigest().encode('utf-8')
-    dbpassword = dbpassword.encode('utf-8')
-    check = bcrypt.checkpw(result, dbpassword)
+    # no bcrypt only sha256
 
-    return check
+    return hashlib.sha256(hashlib.md5(painpassword.encode()).hexdigest().encode('utf-8')).hexdigest().encode('utf-8') == dbpassword.encode('utf-8')
 
 def SystemSettingsValues():
     """Fetches the system settings data."""
-    mycursor.execute("SELECT value_int, value_string FROM system_settings WHERE name = 'website_maintenance' OR name = 'game_maintenance' OR name = 'website_global_alert' OR name = 'website_home_alert' OR name = 'registrations_enabled'")
+    mycursor.execute("SELECT value_int, value FROM config WHERE name = 'website_maintenance' OR name = 'game_maintenance' OR name = 'website_global_alert' OR name = 'website_home_alert' OR name = 'registrations_enabled'")
     SqlData = mycursor.fetchall()
     return {
         "webman": bool(SqlData[0][0]),
@@ -607,22 +647,22 @@ def ApplySystemSettings(DataArray, Session):
         Register = 1
     else:
         Register = 0
-    
+
     #SQL Queries
-    mycursor.execute("UPDATE system_settings SET value_int = %s WHERE name = 'website_maintenance'", (WebMan,))
-    mycursor.execute("UPDATE system_settings SET value_int = %s WHERE name = 'game_maintenance'", (GameMan,))
-    mycursor.execute("UPDATE system_settings SET value_int = %s WHERE name = 'registrations_enabled'", (Register,))
+    mycursor.execute("UPDATE config SET value_int = %s WHERE name = 'website_maintenance'", (WebMan,))
+    mycursor.execute("UPDATE config SET value_int = %s WHERE name = 'game_maintenance'", (GameMan,))
+    mycursor.execute("UPDATE config SET value_int = %s WHERE name = 'registrations_enabled'", (Register,))
 
     #if empty, disable
     if GlobalAlert != "":
-        mycursor.execute("UPDATE system_settings SET value_int = 1, value_string = %s WHERE name = 'website_global_alert'", (GlobalAlert,))
+        mycursor.execute("UPDATE config SET value_int = 1, value = %s WHERE name = 'website_global_alert'", (GlobalAlert,))
     else:
-        mycursor.execute("UPDATE system_settings SET value_int = 0, value_string = '' WHERE name = 'website_global_alert'")
+        mycursor.execute("UPDATE config SET value_int = 0, value = '' WHERE name = 'website_global_alert'")
     if HomeAlert != "":
-        mycursor.execute("UPDATE system_settings SET value_int = 1, value_string = %s WHERE name = 'website_home_alert'", (HomeAlert,))
+        mycursor.execute("UPDATE config SET value_int = 1, value = %s WHERE name = 'website_home_alert'", (HomeAlert,))
     else:
-        mycursor.execute("UPDATE system_settings SET value_int = 0, value_string = '' WHERE name = 'website_home_alert'")
-    
+        mycursor.execute("UPDATE config SET value_int = 0, value = '' WHERE name = 'website_home_alert'")
+
     mydb.commit() #applies the changes
 
 def IsOnline(AccountId: int):
@@ -723,7 +763,7 @@ def FetchUsers(page = 0):
         else:
             Dict["Allowed"] = False
         Users.append(Dict)
-    
+
     return Users
 
 def GetUser(id):
@@ -776,7 +816,7 @@ def UserData(UserID):
         Freeze = mycursor.fetchone()
     except:
         Freeze = False
-  
+
     Data["UserpageContent"] = Data1[0]
     Data["UserColour"] = Data1[1]
     Data["Aka"] = Data1[2]
@@ -796,14 +836,14 @@ def UserData(UserID):
     Data["DonorExpireStr"] = TimeToTimeAgo(Data["DonorExpire"])
 
     #now for silences and ban times
-    Data["IsBanned"] = CoolerInt(Data2[7]) > 0                       
+    Data["IsBanned"] = CoolerInt(Data2[7]) > 0
     Data["BanedAgo"] = TimeToTimeAgo(CoolerInt(Data2[7]))
     Data["IsSilenced"] =  CoolerInt(Data2[5]) > round(time.time())
     Data["SilenceEndAgo"] = TimeToTimeAgo(CoolerInt(Data2[5]))
     if Freeze:
         Data["IsFrozen"] = int(Freeze[0]) > 0
         Data["FreezeDateNo"] = int(Freeze[0])
-        Data["FreezeDate"] = TimeToTimeAgo(Data["FreezeDateNo"])  
+        Data["FreezeDate"] = TimeToTimeAgo(Data["FreezeDateNo"])
     else:
         Data["IsFrozen"] = False
 
@@ -834,7 +874,7 @@ def RAPFetch(page = 1):
     for user in UniqueUsers:
         UserData = GetUser(user)
         UserDict[str(user)] = UserData
-    
+
     #log structure
     #[
     #    {
@@ -1174,7 +1214,7 @@ def ResUnTrict(id : int):
         TimeBan = round(time.time())
         mycursor.execute("UPDATE users SET privileges = 3, ban_datetime = 0 WHERE id = %s", (id,)) #unrestricts
         TheReturn = False
-    else: 
+    else:
         r.publish("peppy:disconnect", json.dumps({ #lets the user know what is up
             "userID" : id,
             "reason" : "Your account has been restricted! Check with staff to see what's up."
@@ -1204,7 +1244,7 @@ def FreezeHandler(id : int):
         TheReturn = True
     mydb.commit()
     return TheReturn
-   
+
 def BanUser(id : int):
     """User go bye bye!"""
     mycursor.execute("SELECT privileges FROM users WHERE id = %s", (id,))
@@ -1249,7 +1289,7 @@ def DeleteAccount(id : int):
     mycursor.execute("DELETE FROM comments WHERE user_id = %s", (id,))
     mycursor.execute("DELETE FROM discord_roles WHERE userid = %s", (id,))
     mycursor.execute("DELETE FROM ip_user WHERE userid = %s", (id,))
-    mycursor.execute("DELETE FROM profile_backgrounds WHERE uid = %s", (id,)) 
+    mycursor.execute("DELETE FROM profile_backgrounds WHERE uid = %s", (id,))
     mycursor.execute("DELETE FROM rank_requests WHERE userid = %s", (id,))
     mycursor.execute("DELETE FROM reports WHERE to_uid = %s OR from_uid = %s", (id, id,))
     mycursor.execute("DELETE FROM tokens WHERE user = %s", (id,))
@@ -1329,20 +1369,26 @@ def PlayStyle(Enum : int):
         Styles.append("Dick")
     if Enum & Eggplant >= 1:
         Styles.append("Eggplant")
-    
+
     return Styles
 
 def PlayerCountCollection(loop = True):
     """Designed to be ran as thread. Grabs player count every set interval and puts in array."""
     while loop:
-        CurrentCount = int(r.get("ripple:online_users").decode("utf-8"))
+        # realistik my crappy server gets stuff from db fuck meeeeee
+        mycursor.execute("SELECT COUNT(*) FROM tokens")
+        CurrentCount = int(mycursor.fetchone()[0])
+        #CurrentCount = int(r.get("shiori:online_users").decode("utf-8"))
         PlayerCount.append(CurrentCount)
         time.sleep(UserConfig["UserCountFetchRate"] * 60)
         #so graph doesnt get too huge
         if len(PlayerCount) > 40:
             PlayerCount.pop(PlayerCount[0])
     if not loop:
-        CurrentCount = int(r.get("ripple:online_users").decode("utf-8"))
+        # again we get crap from db FFFFFF
+        mycursor.execute("SELECT COUNT(*) FROM tokens")
+        CurrentCount = int(mycursor.fetchone()[0])
+        #CurrentCount = int(r.get("shiori:online_users").decode("utf-8"))
         PlayerCount.append(CurrentCount)
         time.sleep(UserConfig["UserCountFetchRate"] * 60)
 
@@ -1350,7 +1396,7 @@ def DashActData():
     """Returns data for dash graphs."""
     Data = {}
     Data["PlayerCount"] = json.dumps(PlayerCount) #string for easier use in js
-    
+
     #getting time intervals
     PrevNum = 0
     IntervalList = []
@@ -1506,7 +1552,7 @@ def UpdatePriv(Form):
 
 def GetMostPlayed():
     """Gets the beatmap with the highest playcount."""
-    mycursor.execute("SELECT beatmap_id, song_name, beatmapset_id, playcount FROM beatmaps ORDER BY playcount DESC LIMIT 1")
+    mycursor.execute("SELECT beatmaps.id, beatmap_sets.title, beatmap_sets.id, COUNT(*) FROM user_plays LEFT JOIN beatmaps ON beatmaps.id = user_plays.beatmap_id LEFT JOIN beatmap_sets ON beatmap_sets.id = beatmaps.set_id ORDER BY COUNT(*) DESC LIMIT 1")
     Beatmap = mycursor.fetchone()
     return {
         "BeatmapId" : Beatmap[0],
@@ -1585,11 +1631,11 @@ def UpdateUserStore(Username: str):
         #if doesnt exist
         with open("rpusers.json", 'w+') as json_file:
             json.dump({}, json_file, indent=4)
-    
+
     #gets current log
     with open("rpusers.json", "r") as Log:
         Store = json.load(Log)
-    
+
     Store[Username] = {
         "Username" : Username,
         "LastLogin" : round(time.time()),
@@ -1610,7 +1656,7 @@ def GetUserStore(Username: str):
     """Gets user info from the store."""
     with open("rpusers.json", "r") as Log:
         Store = json.load(Log)
-    
+
     if Username in list(Store.keys()):
         return Store[Username]
     else:
@@ -1630,9 +1676,16 @@ def GetUserID(Username: str):
 
 def GetStore():
     """Returns user store as list."""
+
+    # no file son? no problem i gotchu
+    if not os.path.exists("rpusers.json"):
+        #if doesnt exist
+        with open("rpusers.json", 'w+') as json_file:
+            json.dump({}, json_file, indent=4)
+
     with open("rpusers.json", "r") as RPUsers:
         Store = json.load(RPUsers)
-    
+
     TheList = []
     for x in list(Store.keys()):
         #timeago - bit of an afterthought so sorry for weird implementation
@@ -1647,7 +1700,7 @@ def SplitListTrue(TheList : list):
     """Splits list into 2 halves."""
     """
     length = len(TheList)
-    return [ TheList[i*length // 2: (i+1)*length // 2] 
+    return [ TheList[i*length // 2: (i+1)*length // 2]
             for i in range(2) ]
     """
     Cool = 0
@@ -1684,22 +1737,22 @@ def RemoveFromLeaderboard(UserID: int):
     Modes = ["std", "ctb", "mania", "taiko"]
     for mode in Modes:
         #redis for each mode
-        r.zrem(f"ripple:leaderboard:{mode}", UserID)
+        r.zrem(f"shiori:leaderboard:{mode}", UserID)
         if UserConfig["HasRelax"]:
             #removes from relax leaderboards
-            r.zrem(f"ripple:leaderboard_relax:{mode}", UserID)
+            r.zrem(f"shiori:leaderboard_relax:{mode}", UserID)
         if UserConfig["HasAutopilot"]:
-            r.zrem(f"ripple:leaderboard_ap:{mode}", UserID)
+            r.zrem(f"shiori:leaderboard_ap:{mode}", UserID)
 
         #removing from country leaderboards
         mycursor.execute("SELECT country FROM users_stats WHERE id = %s LIMIT 1", (UserID,))
         Country = mycursor.fetchone()[0]
         if Country != "XX": #check if the country is not set
-            r.zrem(f"ripple:leaderboard:{mode}:{Country}", UserID)
+            r.zrem(f"shiori:leaderboard:{mode}:{Country}", UserID)
             if UserConfig["HasRelax"]:
-                r.zrem(f"ripple:leaderboard_relax:{mode}:{Country}", UserID)
+                r.zrem(f"shiori:leaderboard_relax:{mode}:{Country}", UserID)
             if UserConfig["HasAutopilot"]:
-                r.zrem(f"ripple:leaderboard_ap:{mode}:{Country}", UserID)
+                r.zrem(f"shiori:leaderboard_ap:{mode}:{Country}", UserID)
 
 def UpdateBanStatus(UserID: int):
     """Updates the ban statuses in bancho."""
@@ -1717,7 +1770,7 @@ def SetBMAPSetStatus(BeatmapSet: int, Staus: int, session):
         TitleText = "ranked"
     elif Staus == 5:
         TitleText = "loved"
-    
+
     mycursor.execute("SELECT song_name, beatmap_id FROM beatmaps WHERE beatmapset_id = %s LIMIT 1", (BeatmapSet,))
     MapData = mycursor.fetchone()
     #Getting bmap name without diff
@@ -1786,7 +1839,7 @@ def FindUserByUsername(User: str, Page):
             else:
                 Dict["Allowed"] = False
             TheUsersDict.append(Dict)
-        
+
         return TheUsersDict
     else:
         return []
@@ -2008,7 +2061,7 @@ def GetClanMembers(ClanID: int):
     for ClanUser in ClanUsers:
         Conditions += f"id = {ClanUser[0]} OR "
     Conditions = Conditions[:-4] #remove the OR
-    
+
     #getting the users
     mycursor.execute(f"SELECT username, id, register_datetime FROM users WHERE {Conditions}") #here i use format as the conditions are a trusted input
     UserData = mycursor.fetchall()
@@ -2073,7 +2126,7 @@ def NukeClan(ClanID: int, session):
     Clan = GetClan(ClanID)
     if not Clan:
         return
-    
+
     mycursor.execute("DELETE FROM clans WHERE id = %s LIMIT 1", (ClanID,))
     mycursor.execute("DELETE FROM user_clans WHERE clan=%s", (ClanID,))
     mydb.commit()
