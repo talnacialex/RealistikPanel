@@ -7,6 +7,8 @@ It uses libraries such as Flask for web and is designed to interface with the Ri
 
 # About
 
+This is an modified version of RealistikPanel! that can be used together with the osu!katakuna's kodachi score server.
+
 You may notice that some of this code (especially the early one) is not too great. This is because this is a learning trip for me.
 I am using a lot of libraries and concepts that are new to me and it's the first time I'm doing them.
 This may be reflected in the quality of the code. I will try to fix up or replace some of the old code when I'm satisfied with the feature set.
@@ -57,4 +59,4 @@ Clan Management
 ![Clan Management](https://i.imgur.com/0VomZxS.png)
 
 # Friendly Reminder!
-Remember kids, always finish your day by going to [this link](https://c.ussr.pl)!
+Remember kids, always finish your day by going to [this link](https://c.ussr.pl) and visit katakuna [here](https://katakuna.cc)!
