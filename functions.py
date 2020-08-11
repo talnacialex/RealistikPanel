@@ -132,7 +132,8 @@ def DashData():
     if Alert == "": #checks if no alert
         Alert = False
 
-    totalPP = r.get("shiori:total_pp")#Not calculated by every server .decode("utf-8")
+    mycursor.execute("SELECT SUM(pp) FROM user_stats stats INNER JOIN ( SELECT user_id, MAX(id) AS newestEntry FROM user_stats GROUP BY id ) newStats ON stats.id = newestEntry AND stats.user_id = newStats.user_id")
+    totalPP = str(mycursor.fetchone()[0])
 
     # kodachi! stores crap in database so use database crap.
     # TODO: OPTIMIZE THE QUERIES MAKE THEM INTO ONE QUERY
@@ -140,9 +141,11 @@ def DashData():
     RegisteredUsers = str(mycursor.fetchone()[0])
     #RegisteredUsers = r.get("shiori:registered_users")
 
-    mycursor.execute("SELECT COUNT(*) FROM tokens")
-    OnlineUsers = str(mycursor.fetchone()[0])
-    #OnlineUsers = r.get("shiori:online_users")
+    #mycursor.execute("SELECT COUNT(*) FROM tokens")
+    #OnlineUsers = str(mycursor.fetchone()[0])
+
+    r.publish("shiori:update.online_users", "")
+    OnlineUsers = int(r.get("shiori:online_users").decode("utf-8"))
 
     mycursor.execute("SELECT COUNT(*) FROM user_plays WHERE pass = 1")
     TotalPlays = str(mycursor.fetchone()[0])
@@ -160,14 +163,9 @@ def DashData():
         r.set('shiori:registered_users', 1)
         RegisteredUsers = r.get("shiori:registered_users")
     if not OnlineUsers:
-        r.set('shiori:online_users', 1)
-        OnlineUsers = r.get("shiori:online_users")
-    if not TotalPlays:
-        r.set('shiori:total_plays', 1)
-        TotalPlays = r.get("shiori:total_plays")
-    if not TotalScores:
-        r.set('shiori:total_submitted_scores', 1)
-        TotalScores = r.get("shiori:total_submitted_scores")
+        r.publish("shiori:update.online_users", "")
+        time.sleep(0.1)
+        OnlineUsers = int(r.get("shiori:online_users").decode("utf-8"))
     response = {
         "RegisteredUsers" : RegisteredUsers,
         "OnlineUsers" : OnlineUsers,
@@ -420,6 +418,10 @@ def CheckPermission(Permissions, Permission):
 def HasPrivilege(UserID : int, ReqPriv = 2):
     """Check if the person trying to access the page has perms to do it."""
     # bro here we have text perms
+
+    # fuck gay python i allow all perms ok
+    if UserID:
+        return True
 
     # 0 = no verification
     # 1 = Only registration required
@@ -695,7 +697,7 @@ def FetchUsers(page = 0):
     """Fetches users for the users page."""
     #This is going to need a lot of patching up i can feel it
     Offset = UserConfig["PageSize"] * page #for the page system to work
-    mycursor.execute("SELECT id, username, privileges, allowed FROM users LIMIT %s OFFSET %s", (UserConfig['PageSize'], Offset,))
+    mycursor.execute("SELECT id, username, 1, 1 FROM users LIMIT %s OFFSET %s", (UserConfig['PageSize'], Offset,))
     People = mycursor.fetchall()
 
     #gets list of all different privileges so an sql select call isnt ran per person
@@ -714,24 +716,24 @@ def FetchUsers(page = 0):
     #}
     PrivilegeDict = {}
     #gets all priv info
-    for Priv in UniquePrivileges:
-        mycursor.execute("SELECT name, color FROM privileges_groups WHERE privileges = %s LIMIT 1", (Priv,))
-        info = mycursor.fetchall()
-        if len(info) == 0:
-            PrivilegeDict[str(Priv)] = {
-                "Name" : f"Unknown ({Priv})",
-                "Privileges" : Priv,
-                "Colour" : "danger"
-            }
-        else:
-            info = info[0]
-            PrivilegeDict[str(Priv)] = {}
-            PrivilegeDict[str(Priv)]["Name"] = info[0]
-            PrivilegeDict[str(Priv)]["Privileges"] = Priv
-            PrivilegeDict[str(Priv)]["Colour"] = info[1]
-            if PrivilegeDict[str(Priv)]["Colour"] == "default" or PrivilegeDict[str(Priv)]["Colour"] == "":
-                #stisla doesnt have a default button so ill hard-code change it to a warning
-                PrivilegeDict[str(Priv)]["Colour"] = "warning"
+    # for Priv in UniquePrivileges:
+    #     mycursor.execute("SELECT name, color FROM privileges_groups WHERE privileges = %s LIMIT 1", (Priv,))
+    #     info = mycursor.fetchall()
+    #     if len(info) == 0:
+    #         PrivilegeDict[str(Priv)] = {
+    #             "Name" : f"Unknown ({Priv})",
+    #             "Privileges" : Priv,
+    #             "Colour" : "danger"
+    #         }
+    #     else:
+    #         info = info[0]
+    #         PrivilegeDict[str(Priv)] = {}
+    #         PrivilegeDict[str(Priv)]["Name"] = info[0]
+    #         PrivilegeDict[str(Priv)]["Privileges"] = Priv
+    #         PrivilegeDict[str(Priv)]["Colour"] = info[1]
+    #         if PrivilegeDict[str(Priv)]["Colour"] == "default" or PrivilegeDict[str(Priv)]["Colour"] == "":
+    #             #stisla doesnt have a default button so ill hard-code change it to a warning
+    #             PrivilegeDict[str(Priv)]["Colour"] = "warning"
 
     #Convierting user data into cool dicts
     #Structure
@@ -746,7 +748,7 @@ def FetchUsers(page = 0):
     Users = []
     for user in People:
         #country query
-        mycursor.execute("SELECT country FROM users_stats WHERE id = %s", (user[0],))
+        mycursor.execute("SELECT country FROM users WHERE id = %s", (user[0],))
         Country = mycursor.fetchall()
         if len(Country) == 0:
             Country = "XX"
@@ -755,7 +757,7 @@ def FetchUsers(page = 0):
         Dict = {
             "Id" : user[0],
             "Name" : user[1],
-            "Privilege" : PrivilegeDict[str(user[2])],
+            "Privilege" : 0,
             "Country" : Country
         }
         if user[3] == 1:
@@ -1042,7 +1044,7 @@ def ModToText(mod: int):
 
 def WipeAccount(AccId):
     """Wipes the account with the given id."""
-    r.publish("peppy:disconnect", json.dumps({ #lets the user know what is up
+    r.publish("shiori:kick", json.dumps({ #lets the user know what is up
         "userID" : AccId,
         "reason" : "Your account has been wiped! F"
     }))
@@ -1215,7 +1217,7 @@ def ResUnTrict(id : int):
         mycursor.execute("UPDATE users SET privileges = 3, ban_datetime = 0 WHERE id = %s", (id,)) #unrestricts
         TheReturn = False
     else:
-        r.publish("peppy:disconnect", json.dumps({ #lets the user know what is up
+        r.publish("shiori:kick", json.dumps({ #lets the user know what is up
             "userID" : id,
             "reason" : "Your account has been restricted! Check with staff to see what's up."
         }))
@@ -1259,7 +1261,7 @@ def BanUser(id : int):
     else:
         mycursor.execute("UPDATE users SET privileges = 0, ban_datetime = %s WHERE id = %s", (Timestamp, id,))
         RemoveFromLeaderboard(id)
-        r.publish("peppy:disconnect", json.dumps({ #lets the user know what is up
+        r.publish("shiori:kick", json.dumps({ #lets the user know what is up
             "userID" : id,
             "reason" : f"You have been banned from {UserConfig['ServerName']}. You will not be missed."
         }))
@@ -1275,7 +1277,7 @@ def ClearHWID(id : int):
 
 def DeleteAccount(id : int):
     """Deletes the account provided. Press F to pay respects."""
-    r.publish("peppy:disconnect", json.dumps({ #lets the user know what is up
+    r.publish("shiori:kick", json.dumps({ #lets the user know what is up
         "userID" : id,
         "reason" : f"You have been deleted from {UserConfig['ServerName']}. Bye!"
     }))
@@ -1310,7 +1312,7 @@ def DeleteAccount(id : int):
 
 def BanchoKick(id : int, reason):
     """Kicks the user from Bancho."""
-    r.publish("peppy:disconnect", json.dumps({ #lets the user know what is up
+    r.publish("shiori:kick", json.dumps({ #lets the user know what is up
         "userID" : id,
         "reason" : reason
     }))
@@ -1375,20 +1377,18 @@ def PlayStyle(Enum : int):
 def PlayerCountCollection(loop = True):
     """Designed to be ran as thread. Grabs player count every set interval and puts in array."""
     while loop:
-        # realistik my crappy server gets stuff from db fuck meeeeee
-        mycursor.execute("SELECT COUNT(*) FROM tokens")
-        CurrentCount = int(mycursor.fetchone()[0])
-        #CurrentCount = int(r.get("shiori:online_users").decode("utf-8"))
+        r.publish("shiori:update.online_users", "")
+        time.sleep(0.1)
+        CurrentCount = int(r.get("shiori:online_users").decode("utf-8"))
         PlayerCount.append(CurrentCount)
         time.sleep(UserConfig["UserCountFetchRate"] * 60)
         #so graph doesnt get too huge
         if len(PlayerCount) > 40:
             PlayerCount.pop(PlayerCount[0])
     if not loop:
-        # again we get crap from db FFFFFF
-        mycursor.execute("SELECT COUNT(*) FROM tokens")
-        CurrentCount = int(mycursor.fetchone()[0])
-        #CurrentCount = int(r.get("shiori:online_users").decode("utf-8"))
+        r.publish("shiori:update.online_users", "")
+        time.sleep(0.1)
+        CurrentCount = int(r.get("shiori:online_users").decode("utf-8"))
         PlayerCount.append(CurrentCount)
         time.sleep(UserConfig["UserCountFetchRate"] * 60)
 
@@ -1552,7 +1552,7 @@ def UpdatePriv(Form):
 
 def GetMostPlayed():
     """Gets the beatmap with the highest playcount."""
-    mycursor.execute("SELECT beatmaps.id, beatmap_sets.title, beatmap_sets.id, COUNT(*) FROM user_plays LEFT JOIN beatmaps ON beatmaps.id = user_plays.beatmap_id LEFT JOIN beatmap_sets ON beatmap_sets.id = beatmaps.set_id ORDER BY COUNT(*) DESC LIMIT 1")
+    mycursor.execute("SELECT beatmaps.id, beatmap_sets.title, beatmap_sets.id, (SELECT COUNT(*) FROM user_plays WHERE beatmap_id = beatmaps.id) as plays FROM user_plays LEFT JOIN beatmaps ON beatmaps.id = user_plays.beatmap_id LEFT JOIN beatmap_sets ON beatmap_sets.id = beatmaps.set_id ORDER BY plays DESC LIMIT 1")
     Beatmap = mycursor.fetchone()
     return {
         "BeatmapId" : Beatmap[0],
@@ -1756,7 +1756,7 @@ def RemoveFromLeaderboard(UserID: int):
 
 def UpdateBanStatus(UserID: int):
     """Updates the ban statuses in bancho."""
-    r.publish("peppy:ban", UserID)
+    r.publish("shiori:ban", UserID)
 
 def SetBMAPSetStatus(BeatmapSet: int, Staus: int, session):
     """Sets status for all beatmaps in beatmapset."""
